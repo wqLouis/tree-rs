@@ -1,9 +1,24 @@
+use clap::Parser;
+
+#[derive(serde::Serialize)]
 struct File {
     file_name: String,
     sub_files: Option<Vec<File>>,
 }
 
-async fn indexing(root: &std::path::Path) -> File {
+/// Tree but rust
+#[derive(clap::Parser)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Output as json
+    #[arg(short = 'j', long = "json", action = clap::ArgAction::SetTrue)]
+    json: bool,
+
+    #[arg(default_value = ".")]
+    root: String,
+}
+
+async fn tree(root: &std::path::Path) -> File {
     async fn index(file: &mut File, parent_path: &std::path::Path) {
         use std::path::Path;
 
@@ -11,7 +26,7 @@ async fn indexing(root: &std::path::Path) -> File {
             return;
         }
 
-        let mut entries = match std::fs::read_dir(parent_path) {
+        let mut entries = match tokio::fs::read_dir(parent_path).await {
             Ok(entries) => entries,
             Err(_) => {
                 file.sub_files = None;
@@ -21,11 +36,20 @@ async fn indexing(root: &std::path::Path) -> File {
 
         let mut file_list: Vec<File> = Vec::new();
 
-        while let entry = entries.next().unwrap().unwrap() {
+        loop {
+            let entry = match entries.next_entry().await {
+                Ok(entry) => match entry {
+                    Some(entry) => entry,
+                    None => break,
+                },
+                Err(_) => break,
+            };
+
             let mut sub_file = File {
                 file_name: entry.file_name().to_str().unwrap_or_default().to_string(),
                 sub_files: None,
             };
+
             let sub_file_name = sub_file.file_name.clone();
 
             Box::pin(index(
@@ -54,6 +78,15 @@ async fn indexing(root: &std::path::Path) -> File {
     root_file
 }
 
-fn main() {
-    let _ = indexing(std::path::Path::new("/"));
+/// format tree string with File struct
+fn format_tree(root: &File) {}
+
+#[tokio::main]
+async fn main() {
+    let args = Args::parse();
+
+    let file = tree(std::path::Path::new(&args.root)).await;
+    if args.json {
+        print!("{}", serde_json::to_string_pretty(&file).unwrap());
+    }
 }
