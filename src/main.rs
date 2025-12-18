@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use clap::Parser;
 
 #[derive(serde::Serialize)]
@@ -20,7 +22,7 @@ struct Args {
 
 fn tree(root: &std::path::Path) -> File {
     fn index(file: &mut File, parent_path: &std::path::Path) {
-        let mut entries = match std::fs::read_dir(parent_path) {
+        let entries = match std::fs::read_dir(parent_path) {
             Ok(entries) => entries,
             Err(_) => {
                 file.sub_files = None;
@@ -28,29 +30,19 @@ fn tree(root: &std::path::Path) -> File {
             }
         };
 
-        let mut file_list: Vec<File> = Vec::new();
-
-        loop {
-            let entry = match entries.next() {
-                Some(entry) => match entry {
-                    Ok(entry) => entry,
-                    Err(_) => break,
-                },
-                None => break,
-            };
-
-            let mut sub_file = File {
-                file_name: entry.file_name().to_str().unwrap_or_default().to_string(),
-                sub_files: None,
-            };
-
-            let sub_file_name = sub_file.file_name.clone();
-
-            index(&mut sub_file, parent_path.join(sub_file_name).as_path());
-
-            file_list.push(sub_file);
-        }
-        file.sub_files = Some(file_list);
+        file.sub_files = Some(
+            entries
+                .map(|entry| {
+                    let file_name = entry.unwrap().file_name();
+                    let mut file = File {
+                        file_name: file_name.clone().into_string().unwrap(),
+                        sub_files: None,
+                    };
+                    index(&mut file, parent_path.join(file_name).as_path());
+                    file
+                })
+                .collect(),
+        );
     }
 
     let mut root_file = File {
