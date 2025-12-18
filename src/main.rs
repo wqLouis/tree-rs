@@ -18,15 +18,9 @@ struct Args {
     root: String,
 }
 
-async fn tree(root: &std::path::Path) -> File {
-    async fn index(file: &mut File, parent_path: &std::path::Path) {
-        use std::path::Path;
-
-        if !(Path::try_exists(&parent_path).unwrap_or(false)) {
-            return;
-        }
-
-        let mut entries = match tokio::fs::read_dir(parent_path).await {
+fn tree(root: &std::path::Path) -> File {
+    fn index(file: &mut File, parent_path: &std::path::Path) {
+        let mut entries = match std::fs::read_dir(parent_path) {
             Ok(entries) => entries,
             Err(_) => {
                 file.sub_files = None;
@@ -37,12 +31,12 @@ async fn tree(root: &std::path::Path) -> File {
         let mut file_list: Vec<File> = Vec::new();
 
         loop {
-            let entry = match entries.next_entry().await {
-                Ok(entry) => match entry {
-                    Some(entry) => entry,
-                    None => break,
+            let entry = match entries.next() {
+                Some(entry) => match entry {
+                    Ok(entry) => entry,
+                    Err(_) => break,
                 },
-                Err(_) => break,
+                None => break,
             };
 
             let mut sub_file = File {
@@ -52,11 +46,7 @@ async fn tree(root: &std::path::Path) -> File {
 
             let sub_file_name = sub_file.file_name.clone();
 
-            Box::pin(index(
-                &mut sub_file,
-                parent_path.join(sub_file_name).as_path(),
-            ))
-            .await;
+            index(&mut sub_file, parent_path.join(sub_file_name).as_path());
 
             file_list.push(sub_file);
         }
@@ -72,8 +62,7 @@ async fn tree(root: &std::path::Path) -> File {
     index(
         &mut root_file,
         std::path::Path::new(&std::path::Path::new(&root_file_name)),
-    )
-    .await;
+    );
 
     root_file
 }
@@ -81,11 +70,10 @@ async fn tree(root: &std::path::Path) -> File {
 /// format tree string with File struct
 fn format_tree(root: &File) {}
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let args = Args::parse();
 
-    let file = tree(std::path::Path::new(&args.root)).await;
+    let file = tree(std::path::Path::new(&args.root));
     if args.json {
         print!("{}", serde_json::to_string_pretty(&file).unwrap());
     }
