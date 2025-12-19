@@ -22,10 +22,14 @@ struct Args {
 
 fn tree(root: &std::path::Path) -> File {
     fn index(file: &mut File, parent_path: &std::path::Path) {
+        if file.file_type != ".dir" {
+            return;
+        }
+
         let entries = match std::fs::read_dir(parent_path) {
             Ok(entries) => entries,
             Err(_) => {
-                file.sub_files = None;
+                // prevent permission deny
                 return;
             }
         };
@@ -43,9 +47,9 @@ fn tree(root: &std::path::Path) -> File {
                             .extension()
                             .unwrap_or_else(|| {
                                 &std::ffi::OsStr::new(if file_type.is_dir() {
-                                    "dir"
+                                    ".dir"
                                 } else if file_type.is_file() {
-                                    "file"
+                                    ".file"
                                 } else {
                                     "None"
                                 })
@@ -61,7 +65,7 @@ fn tree(root: &std::path::Path) -> File {
                             &parent_path.join(std::path::Path::new(&file_name)),
                         );
                     } else {
-                        file_tree.file_type = "symlink".to_string();
+                        file_tree.file_type = ".symlink".to_string();
                     }
 
                     Some(file_tree)
@@ -74,7 +78,7 @@ fn tree(root: &std::path::Path) -> File {
 
     let mut root_file = File {
         file_name: root_file_name.clone(),
-        file_type: "root".to_string(),
+        file_type: ".dir".to_string(),
         sub_files: None,
     };
 
