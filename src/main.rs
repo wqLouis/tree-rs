@@ -10,7 +10,7 @@ struct File {
 /// Tree but rust
 /// Default output as yaml
 #[derive(clap::Parser)]
-#[command(version, about, long_about = None)]
+#[command(version, about, long_about = None, verbatim_doc_comment)]
 struct Args {
     /// Output as json
     #[arg(short = 'j', long = "json", action = clap::ArgAction::SetTrue)]
