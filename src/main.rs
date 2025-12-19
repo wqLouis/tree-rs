@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use clap::Parser;
 
 #[derive(serde::Serialize)]
@@ -10,6 +8,7 @@ struct File {
 }
 
 /// Tree but rust
+/// Default output as yaml
 #[derive(clap::Parser)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -42,7 +41,15 @@ fn tree(root: &std::path::Path) -> File {
                         file_name: file_name.clone().into_string().ok()?,
                         file_type: std::path::Path::new(&file_name)
                             .extension()
-                            .unwrap_or(std::ffi::OsStr::new("directory")) // this should check if its a file or dir
+                            .unwrap_or_else(|| {
+                                &std::ffi::OsStr::new(if file_type.is_dir() {
+                                    "dir"
+                                } else if file_type.is_file() {
+                                    "file"
+                                } else {
+                                    "None"
+                                })
+                            })
                             .to_str()
                             .unwrap_or_default()
                             .to_string(),
@@ -79,17 +86,13 @@ fn tree(root: &std::path::Path) -> File {
     root_file
 }
 
-/// format tree string with File struct
-fn format_tree(root: &File) -> String {
-    let mut formated: String = String::new();
-    formated
-}
-
 fn main() {
     let args = Args::parse();
 
     let file = tree(std::path::Path::new(&args.root));
     if args.json {
         print!("{}", serde_json::to_string_pretty(&file).unwrap());
+    } else {
+        print!("{}", serde_yaml::to_string(&file).unwrap());
     }
 }
